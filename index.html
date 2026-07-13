@@ -51,6 +51,15 @@
         .animate-scan {
             animation: scan-anim 2s infinite linear;
         }
+
+        /* 깜빡이는 로딩 텍스트 효과 */
+        .loading {
+            animation: blinker 1s linear infinite;
+            color: #f59e0b;
+        }
+        @keyframes blinker {
+            50% { opacity: 0; }
+        }
     </style>
 </head>
 <body class="text-gray-900 transition-colors duration-300">
@@ -64,7 +73,7 @@
             </button>
             <div class="flex flex-col justify-center border-l-2 border-gray-300 pl-3 pr-2">
                 <label for="volumeSlider" class="text-sm font-bold text-gray-600 mb-1">소리 크기</label>
-                <!-- 소리 크기 조절 슬라이더 (실시간 반응을 위해 oninput 적용, 완전 묵음지원을 위해 min 0 설정) -->
+                <!-- 소리 크기 조절 슬라이더 (실시간 드래그 반영 oninput 지원) -->
                 <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="1" oninput="adjustVolume(this.value)" class="w-24 sm:w-32 h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none focus:ring-2 focus:ring-yellow-400" aria-label="음성 안내 소리 크기 조절">
             </div>
         </div>
@@ -90,7 +99,7 @@
             <!-- 기능 1: 박스형 (카메라 및 실시간 OCR 연결됨) -->
             <button id="btn-feature-1" onclick="selectFeature(1)" class="group flex flex-col items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-3xl p-8 shadow-xl transition-transform transform hover:scale-105 border-4 border-transparent focus:border-yellow-400" aria-label="박스 형태 약품 유통기한 자동 스캔 시작">
                 <!-- 타이레놀 박스 사진 -->
-                <img src="image_fef8fc.jpg" alt="박스형 약품 사진" class="w-32 h-32 object-contain bg-white rounded-2xl p-2 mb-4 shadow-md border-2 border-blue-400 group-hover:border-yellow-300 transition-colors" aria-hidden="true" onerror="this.src='https://placehold.co/128x128/3b82f6/ffffff?text=Box+Medicine'">
+                <img src="image_fef8fc.jpg" alt="박스형 약품 사진" class="w-32 h-32 object-contain bg-white rounded-2xl p-2 mb-4 shadow-md border-2 border-blue-400 group-hover:border-yellow-300 transition-colors" aria-hidden="true">
                 <span class="text-3xl sm:text-4xl font-black text-center leading-tight">
                     박스형 약품<br>
                     <span class="text-lg sm:text-xl opacity-90 font-bold mt-2 block bg-blue-800 px-3 py-1 rounded-full">자동 유통기한 스캔</span>
@@ -100,7 +109,7 @@
             <!-- 기능 2: 병형 (준비 중) -->
             <button id="btn-feature-2" onclick="selectFeature(2)" class="group flex flex-col items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl p-8 shadow-xl transition-transform transform hover:scale-105 border-4 border-transparent focus:border-yellow-400" aria-label="병 형태 약품 정보 읽기">
                 <!-- 까스활명수 병 사진 -->
-                <img src="image_fef93f.png" alt="병형 약품 사진" class="w-32 h-32 object-contain bg-white rounded-2xl p-2 mb-4 shadow-md border-2 border-emerald-400 group-hover:border-yellow-300 transition-colors" aria-hidden="true" onerror="this.src='https://placehold.co/128x128/10b981/ffffff?text=Bottle+Medicine'">
+                <img src="image_fef93f.png" alt="병형 약품 사진" class="w-32 h-32 object-contain bg-white rounded-2xl p-2 mb-4 shadow-md border-2 border-emerald-400 group-hover:border-yellow-300 transition-colors" aria-hidden="true">
                 <span class="text-3xl sm:text-4xl font-black text-center leading-tight">
                     병형 약품<br>
                     <span class="text-lg sm:text-xl opacity-90 font-bold mt-2 block bg-emerald-800 px-3 py-1 rounded-full">준비 중</span>
@@ -109,7 +118,7 @@
 
             <!-- 기능 3: 알약 통형 (준비 중) -->
             <button id="btn-feature-3" onclick="selectFeature(3)" class="group flex flex-col items-center justify-center bg-purple-600 hover:bg-purple-700 text-white rounded-3xl p-8 shadow-xl transition-transform transform hover:scale-105 border-4 border-transparent focus:border-yellow-400" aria-label="알약 포장형 정보 읽기">
-                <!-- 알약 이모지 -->
+                <!-- 알약은 임시로 이모지 유지 -->
                 <span class="text-7xl mb-4" aria-hidden="true">💊</span>
                 <span class="text-3xl sm:text-4xl font-black text-center leading-tight">
                     알약 통형<br>
@@ -118,7 +127,7 @@
             </button>
         </div>
 
-        <!-- 사용 설명서 카드 (모바일에서도 숫자가 찌그러지지 않고 줄바꿈이 깔끔하도록 수정) -->
+        <!-- 사용 설명서 카드 -->
         <section class="text-center bg-white p-6 sm:p-8 rounded-3xl shadow-lg w-full max-w-3xl border-2 border-gray-100 mx-auto">
             <h2 class="text-2xl sm:text-3xl font-black text-gray-800 mb-6 border-b-4 border-blue-500 pb-2 inline-block">쉽게 사용하는 방법</h2>
             <ol class="text-lg sm:text-2xl font-bold text-gray-700 text-left space-y-6 mx-auto max-w-2xl mt-2 w-full">
@@ -145,32 +154,34 @@
         let isScanning = false;
         let hasFoundResult = false;
         let scanTimer = null;
-        let isProcessing = false; // 중복 API 요청 방지 잠금 변수
         let isTorchOn = false;
-        let lastAudioAlertTime = 0; // 음성 알림 쿨다운 타이머
-        let isSoundOn = true; // 음성 안내 상태
-        let currentVolume = 1.0; // 음성 소리 크기 (0.0 ~ 1.0)
-        
-        // API 연동 키 설정
+        let isSoundOn = true; // 음성 안내 켜짐/꺼짐 상태
+        let currentVolume = 1.0; // 음성 안내 소리 크기 (0.0 ~ 1.0)
+        let isProcessing = false; // 중복 호출 잠금장치
+
+        // ==========================================
+        // [AI 엔진 핵심 설정] Roboflow & Google Vision API Keys
+        // ==========================================
         const API_KEYS = {
             ROBOFLOW: '7V6pHoQiA8J5kjO1LCuX',
             MODEL_ID: 'medicine_date2/1',
             GOOGLE_VISION: 'AIzaSyCTh9xnrIKWfuglS3BEuaSAAQnjdSQhB0Q',
         };
+        // ==========================================
 
         // TTS(음성 합성) 지원 함수
         function speak(text) {
-            if (!isSoundOn) return; 
+            if (!isSoundOn) return; // 음성 안내가 꺼져있으면 무시
             if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); // 진행 중인 소리 즉시 차단
+                window.speechSynthesis.cancel(); // 이전 출력 중인 소리 즉시 중단
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'ko-KR';
-                utterance.rate = 0.9;  // 노령층 맞춤 느긋한 속도
+                utterance.rate = 0.9;  // 노령층을 위한 부드럽고 여유로운 속도
                 utterance.pitch = 1.0;
-                utterance.volume = currentVolume; // 설정된 소리 크기 반영
+                utterance.volume = currentVolume; // 설정된 소리 크기 적용
                 window.speechSynthesis.speak(utterance);
             } else {
-                console.warn("TTS 기능이 작동하지 않는 브라우저입니다.");
+                console.warn("TTS 기능이 작동하지 않는 브라우저 환경입니다.");
             }
         }
 
@@ -189,12 +200,12 @@
             } else {
                 btn.innerHTML = "🔇 꺼짐";
                 if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
+                    window.speechSynthesis.cancel(); // 즉시 소리 끄기
                 }
             }
         }
 
-        // 소리 크기 조절 기능 (즉각 인지를 위한 짧은 '아' 피드백 & 0일 때 자동 음소거 대응)
+        // 소리 크기 조절 기능
         function adjustVolume(value) {
             currentVolume = parseFloat(value);
             const btn = document.getElementById('soundBtn');
@@ -203,12 +214,12 @@
                 isSoundOn = false;
                 btn.innerHTML = "🔇 꺼짐";
                 if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
+                    window.speechSynthesis.cancel(); // 소리 제거
                 }
             } else {
                 isSoundOn = true;
                 btn.innerHTML = "🔊 켜짐";
-                speak("아"); // 아주 짧고 명확한 음량 판정용 소리 출력
+                speak("아"); // 변경 즉시 즉각적인 볼륨 상태 확인용 숏 피드백
             }
         }
 
@@ -219,7 +230,7 @@
             speak(isHighContrast ? "색상 대비를 강조하는 고대비 모드를 켰습니다." : "일반 화면 모드로 돌아왔습니다.");
         }
 
-        // 기능 클릭 이벤트 제어
+        // 대시보드 메뉴 클릭 이벤트 제어
         function selectFeature(featureNum) {
             if (featureNum === 1) {
                 speak("박스형 약품 인식기를 준비하고 있습니다. 잠시만 기다려주세요.");
@@ -230,7 +241,7 @@
         }
 
         /* ==========================================================================
-           실시간 스마트 카메라 인식 엔진 및 제어 파트 (Roboflow + Google Vision 연동)
+           실시간 스마트 카메라 인식 엔진 및 제어 파트 (Web AI 결합 버전)
            ========================================================================== */
 
         // 스캐너 모달 생성 및 뷰포트 레이아웃 구성
@@ -253,9 +264,9 @@
                     
                     <!-- 카메라 스트림 (전체 화면 스캔) -->
                     <div id="cameraContainer" class="relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300">
-                        <video id="cameraVideo" class="w-full h-full object-contain" autoplay playsinline></video>
-                        <canvas id="hiddenCanvas" class="hidden"></canvas> <!-- 분석 처리용 백그라운드 캡처 캔버스 -->
-                        <canvas id="cropCanvas" class="hidden"></canvas> <!-- 박스 영역 크롭용 캔버스 -->
+                        <video id="webcam" class="w-full h-full object-contain" autoplay playsinline></video>
+                        <canvas id="capture-canvas" class="hidden"></canvas>
+                        <canvas id="crop-canvas" class="hidden"></canvas>
                         
                         <!-- 스캔 가이드 인터페이스 -->
                         <div class="absolute inset-0 flex items-center justify-center pointer-events-none p-4">
@@ -265,20 +276,16 @@
                     </div>
 
                     <!-- 실시간 텍스트 피드백 알림 영역 -->
-                    <div id="ocrResultArea" class="bg-white p-6 min-h-[220px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300">
-                        <!-- 실시간 탐색 상태 알림 -->
-                        <div id="scanStatus" class="text-xl font-bold text-gray-500 mb-2 text-center">유통기한을 찾는 중...</div>
+                    <div id="ocrResultArea" class="bg-white p-6 min-h-[220px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300 z-10">
+                        <div id="status-msg" class="text-xl font-bold text-gray-600 mb-2">카메라를 켜는 중입니다...</div>
                         
-                        <!-- 크롭된 이미지 미리보기 (돋보기 기능) -->
-                        <div class="flex flex-col items-center mb-4 w-full max-w-sm">
-                            <span class="text-xs font-bold text-gray-400 mb-1">🔍 선명한 돋보기 화면</span>
-                            <img id="magnifiedImg" class="hidden w-full max-h-24 object-contain rounded-lg border-2 border-blue-400 shadow-sm bg-gray-100" alt="확대된 유통기한">
+                        <!-- 크롭된 돋보기 화면 이미지 영역 -->
+                        <img id="magnified-img" src="" alt="유통기한 사진" class="max-h-24 object-contain border border-gray-300 rounded-lg mb-2 hidden" />
+                        
+                        <div id="expiry-text" class="text-3xl font-black text-gray-900 text-center break-words w-full">
+                            화면 안으로 약 상자의 유통기한 부분을 비춰주세요.
                         </div>
                         
-                        <p id="ocrText" class="text-3xl font-black text-gray-900 text-center break-words w-full">
-                            화면 안으로 약 상자의 유통기한 부분을 비춰주세요.<br>
-                            <span class="text-xl text-blue-600 mt-2 block">(자동으로 글자를 찾아 읽어드립니다)</span>
-                        </p>
                         <!-- 작업 복구 및 다시 스캔 버튼 -->
                         <button id="restartBtn" onclick="resumeScanning()" class="hidden mt-4 w-full md:w-1/2 bg-blue-600 hover:bg-blue-700 text-white text-2xl font-black py-4 rounded-2xl shadow-xl">
                             🔄 다른 부분 스캔하기
@@ -291,15 +298,13 @@
 
             // 모달 초기 상태 및 스타일 셋업
             document.getElementById('cameraModal').classList.remove('hidden');
-            
-            const magnifiedImg = document.getElementById('magnifiedImg');
-            if (magnifiedImg) magnifiedImg.classList.add('hidden');
-
-            document.getElementById('ocrResultArea').className = "bg-white p-6 min-h-[220px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300";
+            document.getElementById('ocrResultArea').className = "bg-white p-6 min-h-[220px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300 z-10";
             document.getElementById('cameraContainer').className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300";
-            document.getElementById('scanStatus').innerText = '유통기한을 찾는 중...';
-            document.getElementById('scanStatus').className = 'text-xl font-bold text-gray-500 mb-2 text-center';
-            document.getElementById('ocrText').innerHTML = '화면 안으로 약 상자의 유통기한 부분을 비춰주세요.<br><span class="text-xl text-blue-600 mt-2 block">(자동으로 글자를 찾아 읽어드립니다)</span>';
+            document.getElementById('status-msg').innerText = '카메라를 연결하는 중...';
+            document.getElementById('status-msg').style.color = '#4b5563';
+            document.getElementById('expiry-text').innerHTML = '화면 안으로 약 상자의 유통기한 부분을 비춰주세요.<br><span class="text-xl text-blue-600 mt-2 block">(자동으로 글자를 찾아 읽어드립니다)</span>';
+            document.getElementById('magnified-img').style.display = 'none';
+            document.getElementById('magnified-img').src = '';
             document.getElementById('restartBtn').classList.add('hidden');
             document.getElementById('scanLine').style.display = 'block';
             
@@ -310,7 +315,7 @@
 
         // 후면 카메라 활성화 및 조명 지원 옵션 연동
         async function startCamera() {
-            const videoElement = document.getElementById('cameraVideo');
+            const videoElement = document.getElementById('webcam');
             
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 alert("이 기기 및 브라우저 환경에서는 카메라 기능을 실행할 수 없습니다.");
@@ -318,7 +323,7 @@
             }
 
             try {
-                // 후면 카메라 세로 최적화 해상도 요구
+                // 후면 카메라 가동 및 최적 해상도 유도
                 const constraints = {
                     video: { 
                         facingMode: 'environment',
@@ -333,31 +338,39 @@
                 videoElement.srcObject = videoStream;
                 videoTrack = videoStream.getVideoTracks()[0];
 
-                // 조명(Torch) 탐색 후 플래시 지원 시 노출
+                // 기기 하드웨어 조명(Torch/Flash) 기능 탑재 확인 후 플래시 버튼 토글 노출
                 const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
                 if (capabilities.torch) {
                     document.getElementById('flashBtn').classList.remove('hidden');
                 }
 
-                // 스트림 재생 시 분석 주기 활성화
+                // 비디오 렌더링 시작 신호를 감지하고 실시간 스캔 루프 활성화
                 videoElement.onloadedmetadata = () => {
                     isScanning = true;
                     hasFoundResult = false;
-                    scanLoop();
+                    isProcessing = false;
+                    document.getElementById('status-msg').innerText = '유통기한을 찾는 중...';
+                    
+                    if (scanTimer) clearInterval(scanTimer);
+                    scanTimer = setInterval(processFrame, 800); // 0.8초마다 분석
                 };
 
             } catch (error) {
                 console.error("카메라 장치 바인딩 에러:", error);
-                alert("카메라를 가동하지 못했습니다. 카메라 접근 권한을 허용해 주세요.");
+                alert("카메라를 가동하지 못했습니다. 브라우저 설정에서 카메라 접근 권한을 허용해 주세요.");
                 speak("카메라 연결 실패. 권한을 확인해주세요.");
                 closeCameraModal();
             }
         }
 
-        // 카메라 모달 닫기 및 자원 회수
+        // 카메라 모달 닫기 및 자원 반환
         function closeCameraModal() {
             isScanning = false;
-            clearTimeout(scanTimer);
+            isProcessing = false;
+            if (scanTimer) {
+                clearInterval(scanTimer);
+                scanTimer = null;
+            }
             
             const modal = document.getElementById('cameraModal');
             if (modal) modal.classList.add('hidden');
@@ -383,98 +396,126 @@
 
             videoTrack.applyConstraints({
                 advanced: [{ torch: isTorchOn }]
-            }).catch(e => console.warn("하드웨어 플래시 제어가 지원되지 않습니다.", e));
+            }).catch(e => console.warn("하드웨어 플래시 제어 명령이 거부되었습니다:", e));
         }
 
-        // 실시간 화면 스캔 및 영상 필터링 프로세스 (Roboflow + Google Vision 연동)
-        async function scanLoop() {
-            if (!isScanning || hasFoundResult || isProcessing) return;
-            
-            const video = document.getElementById('cameraVideo');
-            const capCanvas = document.getElementById('hiddenCanvas');
-            const cropCanvas = document.getElementById('cropCanvas');
-            
-            // 화면 대기 제어
-            if (video.videoWidth === 0 || video.videoHeight === 0) {
-                scanTimer = setTimeout(scanLoop, 500);
-                return;
-            }
+        // 핵심 분석 로직 (0.8초마다 실행)
+        async function processFrame() {
+            // 카메라 준비 안 됨 OR 이미 분석 중 OR 결과 이미 찾음 OR 스캔 중지됨 이면 건너뜀
+            const video = document.getElementById('webcam');
+            if (!video || video.videoWidth === 0 || isProcessing || !isScanning || hasFoundResult) return;
+            isProcessing = true;
 
-            isProcessing = true; // 중복 호출 방지 잠금
+            const capCanvas = document.getElementById('capture-canvas');
+            const capCtx = capCanvas.getContext('2d');
+            const cropCanvas = document.getElementById('crop-canvas');
+            const cropCtx = cropCanvas.getContext('2d');
+
+            const statusMsg = document.getElementById('status-msg');
+            const magnifiedImg = document.getElementById('magnified-img');
+            const expiryText = document.getElementById('expiry-text');
+            const cameraContainer = document.getElementById('cameraContainer');
+            const resultArea = document.getElementById('ocrResultArea');
 
             try {
-                // 1. 카메라 화면 캡처
+                // A. 현재 카메라 화면 캡처
                 capCanvas.width = video.videoWidth;
                 capCanvas.height = video.videoHeight;
-                const capCtx = capCanvas.getContext('2d', { willReadFrequently: true });
-                capCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-                
-                const base64Image = capCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                capCtx.drawImage(video, 0, 0);
 
-                // 2. Roboflow API 직접 호출 (유통기한 위치 인식)
+                // base64 형태로 변환 (data:image/jpeg;base64, 부분 제거)
+                const base64Image = capCanvas
+                    .toDataURL('image/jpeg', 0.8)
+                    .split(',')[1];
+
+                // B. Roboflow API 직접 호출 (위치 찾기)
                 const roboUrl = `https://detect.roboflow.com/${API_KEYS.MODEL_ID}?api_key=${API_KEYS.ROBOFLOW}`;
+
                 const roboResponse = await fetch(roboUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: base64Image,
                 });
-                
+
                 const roboResult = await roboResponse.json();
 
-                // 예측 실패 시 주기적 반복 처리
+                // C. 결과 판단 (미검출 시 UI 가이드 강화)
                 if (!roboResult.predictions || roboResult.predictions.length === 0) {
-                    const statusEl = document.getElementById('scanStatus');
-                    statusEl.innerText = '사용기한이 인식되지 않습니다. 다른 부분을 비춰주세요';
-                    statusEl.className = 'text-xl font-bold text-red-600 mb-2 text-center animate-pulse';
-                    
-                    isProcessing = false;
-                    if (isScanning && !hasFoundResult) {
-                        scanTimer = setTimeout(scanLoop, 800);
+                    if (statusMsg) {
+                        statusMsg.innerText = '사용기한이 인식되지 않습니다. 다른 부분을 비춰주세요';
+                        statusMsg.style.color = 'red';
                     }
-                    return;
+                    if (cameraContainer) {
+                        cameraContainer.className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-red-500 transition-all duration-300";
+                    }
+                    isProcessing = false;
+                    return; // 못 찾았으면 여기서 종료하고 다음 0.8초를 기다림
                 }
 
-                // 3. 최적 박스 캡처 및 이미지 자르기 (Crop)
-                const statusEl = document.getElementById('scanStatus');
-                statusEl.innerText = '사용기한이 인식되었습니다. 카메라를 고정해주세요';
-                statusEl.className = 'text-xl font-bold text-blue-600 mb-2 text-center animate-bounce';
+                // D. 유통기한을 찾았을 때 처리
+                if (statusMsg) {
+                    statusMsg.innerText = '사용기한이 인식되었습니다. 카메라를 고정해주세요';
+                    statusMsg.style.color = 'blue';
+                }
+                if (cameraContainer) {
+                    cameraContainer.className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-blue-500 transition-all duration-300";
+                }
 
                 const bestBox = roboResult.predictions.reduce((prev, current) =>
-                    prev.confidence > current.confidence ? prev : current
+                    prev.confidence > current.confidence ? prev : current,
                 );
 
+                // E. 자바스크립트로 이미지 자르기 (Crop)
                 const padW = bestBox.width * 0.15;
                 const padH = bestBox.height * 0.15;
                 const sx = Math.max(0, bestBox.x - bestBox.width / 2 - padW);
                 const sy = Math.max(0, bestBox.y - bestBox.height / 2 - padH);
-                const sWidth = Math.min(capCanvas.width - sx, bestBox.width + padW * 2);
-                const sHeight = Math.min(capCanvas.height - sy, bestBox.height + padH * 2);
+                const sWidth = Math.min(
+                    capCanvas.width - sx,
+                    bestBox.width + padW * 2,
+                );
+                const sHeight = Math.min(
+                    capCanvas.height - sy,
+                    bestBox.height + padH * 2,
+                );
 
                 cropCanvas.width = sWidth;
                 cropCanvas.height = sHeight;
-                const cropCtx = cropCanvas.getContext('2d');
-                
-                // 가독성 향상 극대 대비 필터 적용
+
+                // 이진화, 대비 향상 필터 효과 (CSS 필터 활용)
                 cropCtx.filter = 'grayscale(100%) contrast(300%)';
-                cropCtx.drawImage(capCanvas, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+                cropCtx.drawImage(
+                    capCanvas,
+                    sx,
+                    sy,
+                    sWidth,
+                    sHeight,
+                    0,
+                    0,
+                    sWidth,
+                    sHeight,
+                );
 
-                // 크롭된 데이터 및 돋보기 활성화
-                const croppedBase64Url = cropCanvas.toDataURL('image/jpeg', 0.9);
-                const croppedBase64 = croppedBase64Url.split(',')[1];
-                
-                const magnifiedImg = document.getElementById('magnifiedImg');
-                magnifiedImg.src = croppedBase64Url;
-                magnifiedImg.classList.remove('hidden');
+                const croppedBase64 = cropCanvas.toDataURL('image/jpeg', 0.9);
+                if (magnifiedImg) {
+                    magnifiedImg.src = croppedBase64;
+                    magnifiedImg.style.display = 'block';
+                }
+                if (expiryText) {
+                    expiryText.innerHTML = "<span class='loading'>구글 AI가 읽는 중...</span>";
+                }
 
-                document.getElementById('ocrText').innerHTML = '유통기한 상자를 발견했습니다!<br><span class="text-xl text-orange-500 mt-2 block animate-pulse">구글 AI가 글씨를 읽는 중입니다...</span>';
-
-                // 4. Google Vision API 직접 연동 (글자 추출)
+                // F. 잘라낸 이미지를 Google Vision API로 직접 전송 (글자 읽기)
+                const cleanCroppedBase64 = croppedBase64.split(',')[1];
                 const googleUrl = `https://vision.googleapis.com/v1/images:annotate?key=${API_KEYS.GOOGLE_VISION}`;
+
                 const googlePayload = {
-                    requests: [{
-                        image: { content: croppedBase64 },
-                        features: [{ type: 'TEXT_DETECTION' }],
-                    }],
+                    requests: [
+                        {
+                            image: { content: cleanCroppedBase64 },
+                            features: [{ type: 'TEXT_DETECTION' }],
+                        },
+                    ],
                 };
 
                 const googleResponse = await fetch(googleUrl, {
@@ -482,78 +523,60 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(googlePayload),
                 });
-                
+
                 const googleResult = await googleResponse.json();
 
-                let textFound = '';
-                if (googleResult.responses && googleResult.responses[0].textAnnotations) {
-                    textFound = googleResult.responses[0].textAnnotations[0].description.trim().replace(/\s+/g, ' ');
+                // G. 최종 텍스트 화면에 출력 및 음성 피드백
+                let textFound = '글씨를 감지하지 못했습니다.';
+                if (
+                    googleResult.responses &&
+                    googleResult.responses[0].textAnnotations
+                ) {
+                    textFound = googleResult.responses[0].textAnnotations[0].description
+                        .trim()
+                        .replace(/\s+/g, ' ');
                 }
 
-                // 5. 판독 텍스트 날짜 처리
-                processRecognizedText(textFound);
+                if (expiryText) {
+                    expiryText.innerHTML = textFound;
+                }
+
+                // 정상 판독이 이루어지면 스캔 루프 중단 후 합격 사운드 송출
+                if (textFound && textFound !== '글씨를 감지하지 못했습니다.') {
+                    hasFoundResult = true;
+                    isScanning = false;
+                    if (scanTimer) {
+                        clearInterval(scanTimer);
+                        scanTimer = null;
+                    }
+                    if (document.getElementById('scanLine')) {
+                        document.getElementById('scanLine').style.display = 'none';
+                    }
+                    if (cameraContainer) {
+                        cameraContainer.className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-green-500 transition-all duration-300";
+                    }
+                    if (resultArea) {
+                        resultArea.className = "bg-green-100 p-6 min-h-[220px] flex flex-col justify-center items-center border-t-8 border-green-500 transition-colors duration-300 z-10";
+                    }
+                    if (statusMsg) {
+                        statusMsg.innerText = '✅ 인식 성공!';
+                        statusMsg.style.color = 'green';
+                    }
+                    
+                    const restartBtn = document.getElementById('restartBtn');
+                    if (restartBtn) restartBtn.classList.remove('hidden');
+
+                    speak(`인식되었습니다. 약 상자의 유통기한은, ${textFound} 입니다. 다른 면을 다시 스캔하려면 스캔하기 버튼을 누르세요.`);
+                }
 
             } catch (error) {
-                console.error('스캔 엔진 내부 오류:', error);
+                console.error('OCR 파싱 예외 발생:', error);
+                if (statusMsg) {
+                    statusMsg.innerText = '네트워크 통신 오류가 발생했습니다.';
+                    statusMsg.style.color = 'red';
+                }
             } finally {
-                isProcessing = false;
-                if (isScanning && !hasFoundResult) {
-                    scanTimer = setTimeout(scanLoop, 1000);
-                }
-            }
-        }
-
-        // 추출된 텍스트 날짜 정밀 정규 매칭 처리
-        function processRecognizedText(text) {
-            if (!text || text.trim().length < 4) return;
-            
-            console.log("인식된 전체 로우 텍스트:", text);
-
-            // 유연한 매칭 패턴 (연속된 8자리, 년/월/일 분리형태 모두 대처)
-            const datePattern = /(20\d{2}|[2-9]\d)\s*[-.년_,\/\s]?\s*(0[1-9]|1[0-2])\s*[-.월_,\/\s]?\s*(0[1-9]|[12]\d|3[01])/;
-            const match = text.match(datePattern);
-
-            const resultArea = document.getElementById('ocrResultArea');
-            const resultText = document.getElementById('ocrText');
-            const cameraContainer = document.getElementById('cameraContainer');
-
-            if (match) {
-                hasFoundResult = true;
-                document.getElementById('scanLine').style.display = 'none';
-
-                let year = match[1];
-                if (year.length === 2) {
-                    year = "20" + year;
-                }
-                const month = match[2].padStart(2, '0');
-                const day = match[3].padStart(2, '0');
-                const formattedDate = `${year}년 ${month}월 ${day}일`;
-
-                // 시각 및 형태 피드백 업데이트 (성공 테두리)
-                cameraContainer.className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-green-500 transition-all duration-300";
-                resultArea.className = "bg-green-100 p-6 min-h-[220px] flex flex-col justify-center items-center border-t-8 border-green-500 transition-colors duration-300";
-                
-                document.getElementById('scanStatus').innerText = '✅ 유통기한 판독 완료';
-                document.getElementById('scanStatus').className = 'text-2xl font-black text-green-700 mb-2 text-center';
-                
-                resultText.innerHTML = `
-                    <span class="text-5xl font-black text-gray-900 tracking-wider">${formattedDate} 까지</span>
-                `;
-                
-                document.getElementById('restartBtn').classList.remove('hidden');
-                speak(`인식에 성공했습니다. 유통기한은 ${year}년 ${month}월 ${day}일 까지입니다. 다시 스캔하시려면 아래 버튼을 눌러주세요.`);
-            } else {
-                // 날짜 검출은 실패했으나 글씨가 읽히는 상태 유지 피드백
-                resultText.innerHTML = `
-                    <span class="text-lg text-gray-500 block mb-1">판독된 임시 문자: "${text}"</span>
-                    <span class="text-xl text-red-600 font-bold block">유통기한 형식을 찾지 못했습니다. 조금 더 바르게 비춰주세요.</span>
-                `;
-                
-                const currentTime = Date.now();
-                if (currentTime - lastAudioAlertTime > 8000) {
-                    speak("글자가 선명하게 보이도록 조금만 더 가까이 가져가 대어 주세요.");
-                    lastAudioAlertTime = currentTime;
-                }
+                isProcessing = false; // 락 해제
             }
         }
 
@@ -562,22 +585,39 @@
             hasFoundResult = false;
             isProcessing = false;
             
-            const magnifiedImg = document.getElementById('magnifiedImg');
-            if(magnifiedImg) {
-                magnifiedImg.classList.add('hidden');
-                magnifiedImg.src = '';
+            const resultArea = document.getElementById('ocrResultArea');
+            const cameraContainer = document.getElementById('cameraContainer');
+            const statusMsg = document.getElementById('status-msg');
+            const magnifiedImg = document.getElementById('magnified-img');
+            const expiryText = document.getElementById('expiry-text');
+            const restartBtn = document.getElementById('restartBtn');
+            const scanLine = document.getElementById('scanLine');
+
+            if (resultArea) {
+                resultArea.className = "bg-white p-6 min-h-[220px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300 z-10";
             }
+            if (cameraContainer) {
+                cameraContainer.className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300";
+            }
+            if (statusMsg) {
+                statusMsg.innerText = '유통기한을 찾는 중...';
+                statusMsg.style.color = '#4b5563'; // gray-600
+            }
+            if (magnifiedImg) {
+                magnifiedImg.src = '';
+                magnifiedImg.style.display = 'none';
+            }
+            if (expiryText) {
+                expiryText.innerHTML = '화면 안으로 약 상자의 유통기한 부분을 비춰주세요.<br><span class="text-xl text-blue-600 mt-2 block">(자동으로 글자를 찾아 읽어드립니다)</span>';
+            }
+            if (restartBtn) restartBtn.classList.add('hidden');
+            if (scanLine) scanLine.style.display = 'block';
             
-            document.getElementById('ocrResultArea').className = "bg-white p-6 min-h-[220px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300";
-            document.getElementById('cameraContainer').className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300";
-            document.getElementById('scanStatus').innerText = '유통기한을 찾는 중...';
-            document.getElementById('scanStatus').className = 'text-xl font-bold text-gray-500 mb-2 text-center';
-            document.getElementById('ocrText').innerHTML = '화면 안으로 약 상자의 유통기한 부분을 비춰주세요.<br><span class="text-xl text-blue-600 mt-2 block">(자동으로 글자를 찾아 읽어드립니다)</span>';
-            document.getElementById('restartBtn').classList.add('hidden');
-            document.getElementById('scanLine').style.display = 'block';
+            speak("다시 스캔을 시작합니다. 약 상자의 유통기한 부분을 화면에 대어 주세요.");
             
-            speak("다시 스캔을 시작합니다. 약 상자의 유통기한 부분을 화면에 선명하게 보여주세요.");
-            scanLoop();
+            isScanning = true;
+            if (scanTimer) clearInterval(scanTimer);
+            scanTimer = setInterval(processFrame, 800); // 루프 재개
         }
     </script>
 </body>
