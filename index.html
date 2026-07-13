@@ -58,11 +58,19 @@
 <body class="text-gray-900 transition-colors duration-300">
 
     <!-- 상단 접근성 컨트롤 바 -->
-    <header class="w-full bg-gray-200 p-4 flex justify-between items-center shadow-md z-10" aria-label="접근성 도움 바">
-        <button id="soundBtn" onclick="toggleSound()" class="text-2xl font-black bg-white px-5 py-3 rounded-xl shadow border-2 border-gray-400 focus:outline-none" aria-label="음성 안내 켜기/끄기">
-            🔊 음성 켜짐
-        </button>
-        <button id="contrastBtn" onclick="toggleContrast()" class="text-2xl font-black bg-black text-yellow-400 px-5 py-3 rounded-xl shadow border-2 border-yellow-400 focus:outline-none" aria-label="색상 반전 고대비 모드 토글">
+    <header class="w-full bg-gray-200 p-4 flex flex-wrap justify-between items-center shadow-md z-10 gap-4" aria-label="접근성 도움 바">
+        <!-- 음성 제어 그룹 -->
+        <div class="flex items-center gap-3 bg-white p-2 rounded-xl shadow border-2 border-gray-400">
+            <button id="soundBtn" onclick="toggleSound()" class="text-xl sm:text-2xl font-black px-4 py-2 rounded-lg hover:bg-gray-100 focus:outline-none transition-colors" aria-label="음성 안내 켜기/끄기">
+                🔊 켜짐
+            </button>
+            <div class="flex flex-col justify-center border-l-2 border-gray-300 pl-3 pr-2">
+                <label for="volumeSlider" class="text-sm font-bold text-gray-600 mb-1">소리 크기</label>
+                <!-- 소리 크기 조절 슬라이더 -->
+                <input type="range" id="volumeSlider" min="0.1" max="1" step="0.1" value="1" onchange="adjustVolume(this.value)" class="w-24 sm:w-32 h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none focus:ring-2 focus:ring-yellow-400" aria-label="음성 안내 소리 크기 조절">
+            </div>
+        </div>
+        <button id="contrastBtn" onclick="toggleContrast()" class="text-xl sm:text-2xl font-black bg-black text-yellow-400 px-5 py-3 rounded-xl shadow border-2 border-yellow-400 focus:outline-none" aria-label="색상 반전 고대비 모드 토글">
             고대비 모드 ◑
         </button>
     </header>
@@ -113,20 +121,20 @@
         </div>
 
         <!-- 사용 설명서 카드 -->
-        <section class="text-center bg-white p-6 rounded-3xl shadow-lg w-full max-w-3xl border-2 border-gray-100 mx-auto">
-            <h2 class="text-3xl font-black text-gray-800 mb-4 border-b-4 border-blue-500 pb-2 inline-block">쉽게 사용하는 방법</h2>
-            <ol class="text-xl sm:text-2xl font-bold text-gray-700 text-left space-y-4 mx-auto max-w-lg mt-4">
-                <li class="flex items-start">
-                    <span class="bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center mr-4 shrink-0 font-black">1</span>
-                    <span>위의 <strong>[박스형 약품]</strong> 버튼을 누릅니다.</span>
+        <section class="text-center bg-white p-6 sm:p-8 rounded-3xl shadow-lg w-full max-w-3xl border-2 border-gray-100 mx-auto">
+            <h2 class="text-2xl sm:text-3xl font-black text-gray-800 mb-6 border-b-4 border-blue-500 pb-2 inline-block">쉽게 사용하는 방법</h2>
+            <ol class="text-lg sm:text-2xl font-bold text-gray-700 text-left space-y-6 mx-auto max-w-2xl mt-2 w-full">
+                <li class="flex items-start gap-3 sm:gap-4">
+                    <span class="bg-blue-600 text-white rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 font-black text-xl sm:text-2xl shadow-md mt-0.5">1</span>
+                    <span class="flex-1 break-keep leading-relaxed pt-1.5 sm:pt-2">위의 <strong>[박스형 약품]</strong> 버튼을 누릅니다.</span>
                 </li>
-                <li class="flex items-start">
-                    <span class="bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center mr-4 shrink-0 font-black">2</span>
-                    <span>카메라 허용을 한 뒤, 화면 중앙 네모 칸에 약 상자의 유통기한 글자를 맞춥니다.</span>
+                <li class="flex items-start gap-3 sm:gap-4">
+                    <span class="bg-blue-600 text-white rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 font-black text-xl sm:text-2xl shadow-md mt-0.5">2</span>
+                    <span class="flex-1 break-keep leading-relaxed pt-1.5 sm:pt-2">카메라 접근을 허용한 뒤, <strong>화면 안으로 약 상자의 유통기한 글자가 들어오도록</strong> 비춰주세요.</span>
                 </li>
-                <li class="flex items-start">
-                    <span class="bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center mr-4 shrink-0 font-black">3</span>
-                    <span>잠시 가만히 계시면 자동으로 인식을 완료해 음성으로 읽어줍니다.</span>
+                <li class="flex items-start gap-3 sm:gap-4">
+                    <span class="bg-blue-600 text-white rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 font-black text-xl sm:text-2xl shadow-md mt-0.5">3</span>
+                    <span class="flex-1 break-keep leading-relaxed pt-1.5 sm:pt-2">잠시 가만히 계시면 자동으로 인식을 완료해 음성으로 읽어줍니다.</span>
                 </li>
             </ol>
         </section>
@@ -143,6 +151,7 @@
         let isTorchOn = false;
         let lastAudioAlertTime = 0; // 음성 알림 무한 루프 방지 쿨다운 타이머
         let isSoundOn = true; // 음성 안내 켜짐/꺼짐 상태
+        let currentVolume = 1.0; // 음성 안내 소리 크기 (0.1 ~ 1.0)
 
         // TTS(음성 합성) 지원 함수
         function speak(text) {
@@ -153,6 +162,7 @@
                 utterance.lang = 'ko-KR';
                 utterance.rate = 0.9;  // 노령층을 위한 부드럽고 여유로운 속도
                 utterance.pitch = 1.0;
+                utterance.volume = currentVolume; // 설정된 소리 크기 적용
                 window.speechSynthesis.speak(utterance);
             } else {
                 console.warn("TTS 기능이 작동하지 않는 브라우저 환경입니다.");
@@ -164,14 +174,27 @@
             isSoundOn = !isSoundOn;
             const btn = document.getElementById('soundBtn');
             if (isSoundOn) {
-                btn.innerHTML = "🔊 음성 켜짐";
+                btn.innerHTML = "🔊 켜짐";
                 speak("음성 안내 기능을 켰습니다.");
             } else {
-                btn.innerHTML = "🔇 음성 꺼짐";
+                btn.innerHTML = "🔇 꺼짐";
                 if ('speechSynthesis' in window) {
                     window.speechSynthesis.cancel(); // 즉시 소리 끄기
                 }
             }
+        }
+
+        // 소리 크기 조절 기능
+        function adjustVolume(value) {
+            currentVolume = parseFloat(value);
+            
+            // 만약 소리가 꺼져있는 상태에서 볼륨 바를 움직이면 자동으로 소리를 켭니다.
+            if (!isSoundOn) {
+                isSoundOn = true;
+                document.getElementById('soundBtn').innerHTML = "🔊 켜짐";
+            }
+            
+            speak("소리 크기를 조절했습니다.");
         }
 
         // 고대비 테마 전환 기능
