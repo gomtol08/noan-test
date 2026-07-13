@@ -66,8 +66,8 @@
             </button>
             <div class="flex flex-col justify-center border-l-2 border-gray-300 pl-3 pr-2">
                 <label for="volumeSlider" class="text-sm font-bold text-gray-600 mb-1">소리 크기</label>
-                <!-- 소리 크기 조절 슬라이더 -->
-                <input type="range" id="volumeSlider" min="0.1" max="1" step="0.1" value="1" onchange="adjustVolume(this.value)" class="w-24 sm:w-32 h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none focus:ring-2 focus:ring-yellow-400" aria-label="음성 안내 소리 크기 조절">
+                <!-- 소리 크기 조절 슬라이더 (완전 음소거 지원을 위해 min을 0으로 변경, 즉각 반응을 위해 oninput 적용) -->
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="1" oninput="adjustVolume(this.value)" class="w-24 sm:w-32 h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none focus:ring-2 focus:ring-yellow-400" aria-label="음성 안내 소리 크기 조절">
             </div>
         </div>
         <button id="contrastBtn" onclick="toggleContrast()" class="text-xl sm:text-2xl font-black bg-black text-yellow-400 px-5 py-3 rounded-xl shadow border-2 border-yellow-400 focus:outline-none" aria-label="색상 반전 고대비 모드 토글">
@@ -151,7 +151,7 @@
         let isTorchOn = false;
         let lastAudioAlertTime = 0; // 음성 알림 무한 루프 방지 쿨다운 타이머
         let isSoundOn = true; // 음성 안내 켜짐/꺼짐 상태
-        let currentVolume = 1.0; // 음성 안내 소리 크기 (0.1 ~ 1.0)
+        let currentVolume = 1.0; // 음성 안내 소리 크기 (0.0 ~ 1.0)
 
         // TTS(음성 합성) 지원 함수
         function speak(text) {
@@ -173,8 +173,14 @@
         function toggleSound() {
             isSoundOn = !isSoundOn;
             const btn = document.getElementById('soundBtn');
+            const slider = document.getElementById('volumeSlider');
             if (isSoundOn) {
                 btn.innerHTML = "🔊 켜짐";
+                // 꺼진 상태에서 켤 때 볼륨이 0이면 기본 0.5로 복구해 들리게 조치
+                if (parseFloat(slider.value) === 0) {
+                    currentVolume = 0.5;
+                    slider.value = 0.5;
+                }
                 speak("음성 안내 기능을 켰습니다.");
             } else {
                 btn.innerHTML = "🔇 꺼짐";
@@ -187,14 +193,23 @@
         // 소리 크기 조절 기능
         function adjustVolume(value) {
             currentVolume = parseFloat(value);
+            const btn = document.getElementById('soundBtn');
             
-            // 만약 소리가 꺼져있는 상태에서 볼륨 바를 움직이면 자동으로 소리를 켭니다.
-            if (!isSoundOn) {
+            if (currentVolume === 0) {
+                // 완전히 다 줄이면 소리가 꺼짐으로 연동
+                isSoundOn = false;
+                btn.innerHTML = "🔇 꺼짐";
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel(); // 진행 중인 음성 차단
+                }
+            } else {
+                // 볼륨이 0보다 크면 자동으로 음성을 다시 켬
                 isSoundOn = true;
-                document.getElementById('soundBtn').innerHTML = "🔊 켜짐";
+                btn.innerHTML = "🔊 켜짐";
+                
+                // 볼륨 확인용 테스트 멘트를 간결한 '아'로 즉각 들려줌
+                speak("아");
             }
-            
-            speak("소리 크기를 조절했습니다.");
         }
 
         // 고대비 테마 전환 기능
