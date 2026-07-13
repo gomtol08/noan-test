@@ -249,9 +249,9 @@
         async function openCameraModal() {
             if (!document.getElementById('cameraModal')) {
                 const modalHtml = `
-                <div id="cameraModal" class="fixed inset-0 bg-black z-50 flex flex-col" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+                <div id="cameraModal" class="fixed inset-0 bg-black z-50 flex flex-col h-[100dvh]" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
                     <!-- 헤더 및 기능 제어 바 -->
-                    <div class="p-4 flex justify-between items-center bg-gray-900 text-white border-b border-gray-800">
+                    <div class="p-4 flex justify-between items-center bg-gray-900 text-white border-b border-gray-800 shrink-0">
                         <h2 id="modalTitle" class="text-2xl font-black">유통기한 스캔 카메라</h2>
                         <div class="flex gap-3">
                             <button id="flashBtn" onclick="toggleFlash()" class="hidden text-xl font-bold bg-yellow-400 text-black px-4 py-2 rounded-xl focus:outline-none">
@@ -264,7 +264,7 @@
                     </div>
                     
                     <!-- 카메라 스트림 (전체 화면 스캔) -->
-                    <div id="cameraContainer" class="relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300">
+                    <div id="cameraContainer" class="relative flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300">
                         <video id="cameraVideo" class="w-full h-full object-contain" autoplay playsinline></video>
                         <canvas id="hiddenCanvas" class="hidden"></canvas>
                         <canvas id="cropCanvas" class="hidden"></canvas>
@@ -276,14 +276,14 @@
                         </div>
                     </div>
 
-                    <!-- 실시간 텍스트 피드백 알림 영역 -->
-                    <div id="ocrResultArea" class="bg-white p-6 min-h-[220px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300 z-10">
+                    <!-- 실시간 텍스트 피드백 알림 영역 (스크롤 지원) -->
+                    <div id="ocrResultArea" class="bg-white p-6 shrink-0 min-h-[220px] max-h-[50vh] overflow-y-auto flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300 z-10 w-full">
                         <div id="status-msg" class="text-xl font-bold text-gray-600 mb-2">카메라를 켜는 중입니다...</div>
                         
                         <!-- 선명한 돋보기 화면 이미지 영역 -->
-                        <div id="magnifierArea" class="flex flex-col items-center mb-2 hidden">
+                        <div id="magnifierArea" class="flex flex-col items-center mb-2 hidden w-full">
                             <div class="text-sm font-bold text-blue-600 mb-1">🔍 선명한 돋보기 화면</div>
-                            <img id="magnified-img" src="" alt="유통기한 사진" class="max-h-24 object-contain border border-gray-300 rounded-lg shadow-sm" />
+                            <img id="magnified-img" src="" alt="유통기한 사진" class="max-h-24 md:max-h-32 object-contain border border-gray-300 rounded-lg shadow-sm w-full" />
                         </div>
                         
                         <div id="ocrText" class="text-3xl font-black text-gray-900 text-center break-words w-full">
@@ -291,7 +291,7 @@
                         </div>
                         
                         <!-- 작업 복구 및 다시 스캔 버튼 -->
-                        <button id="restartBtn" onclick="resumeScanning()" class="hidden mt-4 w-full md:w-1/2 bg-blue-600 hover:bg-blue-700 text-white text-2xl font-black py-4 rounded-2xl shadow-xl">
+                        <button id="restartBtn" onclick="resumeScanning()" class="hidden mt-4 w-full md:w-1/2 bg-blue-600 hover:bg-blue-700 text-white text-2xl font-black py-4 rounded-2xl shadow-xl shrink-0">
                             🔄 다른 부분 스캔하기
                         </button>
                     </div>
@@ -302,8 +302,8 @@
 
             // 모달 초기 상태 및 스타일 셋업
             document.getElementById('cameraModal').classList.remove('hidden');
-            document.getElementById('ocrResultArea').className = "bg-white p-6 min-h-[220px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300 z-10";
-            document.getElementById('cameraContainer').className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300";
+            document.getElementById('ocrResultArea').className = "bg-white p-6 shrink-0 min-h-[220px] max-h-[50vh] overflow-y-auto flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300 z-10 w-full";
+            document.getElementById('cameraContainer').className = "relative flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300";
             document.getElementById('status-msg').innerText = '카메라를 연결하는 중...';
             document.getElementById('status-msg').style.color = '#4b5563';
             document.getElementById('ocrText').innerHTML = '화면 안으로 약 상자의 유통기한 부분을 비춰주세요.<br><span class="text-xl text-blue-600 mt-2 block">(자동으로 글자를 찾아 읽어드립니다)</span>';
@@ -444,14 +444,17 @@
 
                 const roboResult = await roboResponse.json();
 
-                // C. Roboflow 결과 판단 (미검출 시 UI 상태 복구)
-                if (!roboResult.predictions || roboResult.predictions.length === 0) {
+                // C. Roboflow 결과 판단 (미검출 시 UI 상태 복구 및 오인식 방지를 위한 신뢰도 필터링)
+                // confidence 0.4 (40%) 이상인 예측 결과만 유효한 것으로 간주하여 바코드 등 오인식 확률을 낮춤
+                const validPredictions = (roboResult.predictions || []).filter(p => p.confidence > 0.4);
+
+                if (validPredictions.length === 0) {
                     if (statusMsg) {
-                        statusMsg.innerText = '사용기한이 인식되지 않습니다. 다른 부분을 비춰주세요';
+                        statusMsg.innerText = '사용기한이 명확히 인식되지 않습니다. 다른 부분을 비춰주세요';
                         statusMsg.style.color = '#ef4444'; // red-500
                     }
                     if (cameraContainer) {
-                        cameraContainer.className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-red-500 transition-all duration-300";
+                        cameraContainer.className = "relative flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden border-8 border-red-500 transition-all duration-300";
                     }
                     isProcessing = false;
                     return; 
@@ -463,10 +466,10 @@
                     statusMsg.style.color = '#3b82f6'; // blue-500
                 }
                 if (cameraContainer) {
-                    cameraContainer.className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-blue-500 transition-all duration-300";
+                    cameraContainer.className = "relative flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden border-8 border-blue-500 transition-all duration-300";
                 }
 
-                const bestBox = roboResult.predictions.reduce((prev, current) =>
+                const bestBox = validPredictions.reduce((prev, current) =>
                     prev.confidence > current.confidence ? prev : current,
                 );
 
@@ -555,10 +558,10 @@
                         document.getElementById('scanLine').style.display = 'none';
                     }
                     if (cameraContainer) {
-                        cameraContainer.className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-green-500 transition-all duration-300";
+                        cameraContainer.className = "relative flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden border-8 border-green-500 transition-all duration-300";
                     }
                     if (resultArea) {
-                        resultArea.className = "bg-green-100 p-6 min-h-[220px] flex flex-col justify-center items-center border-t-8 border-green-500 transition-colors duration-300 z-10";
+                        resultArea.className = "bg-green-100 p-6 shrink-0 min-h-[220px] max-h-[50vh] overflow-y-auto flex flex-col justify-center items-center border-t-8 border-green-500 transition-colors duration-300 z-10 w-full";
                     }
                     if (statusMsg) {
                         statusMsg.innerText = '✅ 인식 성공!';
@@ -569,7 +572,8 @@
                     if (restartBtn) restartBtn.classList.remove('hidden');
 
                     // 스마트 분석: 텍스트 안에서 날짜 형태를 찾으면 깔끔하게 포맷하여 안내
-                    const datePattern = /(20\d{2}|[2-9]\d)\s*[-.년_,\/\s]\s*(0[1-9]|1[0-2]|[1-9])\s*[-.월_,\/\s]\s*(0[1-9]|[12]\d|3[01]|[1-9])/;
+                    // 바코드 등 단순 숫자 나열을 방지하기 위해 월/일 형식을 더 엄격하게 제한 (01~12월, 01~31일)
+                    const datePattern = /(20\d{2}|[2-9]\d)\s*[-.년_,\/\s]\s*(0[1-9]|1[0-2])\s*[-.월_,\/\s]\s*(0[1-9]|[12]\d|3[01])/;
                     const dateMatch = textFound.match(datePattern);
 
                     if (dateMatch) {
@@ -587,12 +591,13 @@
                         `;
                         speak(`인식되었습니다. 약 상자의 유통기한은 ${year}년 ${month}월 ${day}일 까지 입니다. 다른 면을 다시 확인하려면 스캔 버튼을 누르세요.`);
                     } else {
-                        // 규격 날짜는 아니나 텍스트 검출이 이루어진 경우 원시 문자열 노출
+                        // 규격 날짜는 아니나 텍스트 검출이 이루어진 경우 원시 문자열 노출 (바코드 오인식 대응 안내 추가)
                         ocrText.innerHTML = `
-                            <span class="text-green-700 text-2xl font-black mb-1 block">✅ 글씨 식별 성공</span>
-                            <span class="text-3xl font-black text-gray-900 leading-snug">${textFound}</span>
+                            <span class="text-yellow-600 text-2xl font-black mb-1 block">⚠️ 글씨 식별 완료 (확인 필요)</span>
+                            <span class="text-3xl font-black text-gray-900 leading-snug break-all">${textFound}</span>
+                            <span class="text-sm font-bold text-gray-500 mt-2 block">유통기한이 아닌 다른 글씨(바코드 등)일 수 있습니다. 화면을 돋보기 영역과 비교해보세요.</span>
                         `;
-                        speak(`인식되었습니다. 표시된 글자는 ${textFound} 입니다. 다시 스캔하려면 다시 스캔 버튼을 누르세요.`);
+                        speak(`표시된 글자는 ${textFound} 입니다. 유통기한이 맞는지 화면의 돋보기 영역을 확인해주시고, 아니면 다시 스캔 버튼을 눌러주세요.`);
                     }
                 } else {
                     if (ocrText) {
@@ -626,10 +631,10 @@
             const scanLine = document.getElementById('scanLine');
 
             if (resultArea) {
-                resultArea.className = "bg-white p-6 min-h-[220px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300 z-10";
+                resultArea.className = "bg-white p-6 shrink-0 min-h-[220px] max-h-[50vh] overflow-y-auto flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300 z-10 w-full";
             }
             if (cameraContainer) {
-                cameraContainer.className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300";
+                cameraContainer.className = "relative flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300";
             }
             if (statusMsg) {
                 statusMsg.innerText = '유통기한을 찾는 중...';
