@@ -6,8 +6,6 @@
     <title>의약품 정보 확대 도우미</title>
     <!-- Tailwind CSS 로드 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Tesseract.js 최신 v5 안정 버전 로드 -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
     
     <style>
@@ -144,14 +142,21 @@
         // 상태 제어 전역 변수
         let videoStream = null;
         let videoTrack = null;
-        let ocrWorker = null;
         let isScanning = false;
         let hasFoundResult = false;
         let scanTimer = null;
+        let isProcessing = false; // 중복 API 요청 방지 잠금 변수
         let isTorchOn = false;
         let lastAudioAlertTime = 0; // 음성 알림 무한 루프 방지 쿨다운 타이머
         let isSoundOn = true; // 음성 안내 켜짐/꺼짐 상태
         let currentVolume = 1.0; // 음성 안내 소리 크기 (0.0 ~ 1.0)
+        
+        // API 연동 키 설정
+        const API_KEYS = {
+            ROBOFLOW: '7V6pHoQiA8J5kjO1LCuX',
+            MODEL_ID: 'medicine_date2/1',
+            GOOGLE_VISION: 'AIzaSyCTh9xnrIKWfuglS3BEuaSAAQnjdSQhB0Q',
+        };
 
         // TTS(음성 합성) 지원 함수
         function speak(text) {
@@ -230,21 +235,8 @@
         }
 
         /* ==========================================================================
-           실시간 스마트 카메라 인식 엔진 및 제어 파트
+           실시간 스마트 카메라 인식 엔진 및 제어 파트 (Roboflow + Google Vision 연동)
            ========================================================================== */
-
-        // OCR 분석기 초기화 (v5 방식 대응)
-        async function initTesseract() {
-            if (!ocrWorker) {
-                try {
-                    console.log("OCR 엔진을 구축하는 중...");
-                    ocrWorker = await Tesseract.createWorker('kor+eng');
-                    console.log("Tesseract 엔진 활성화 성공");
-                } catch (e) {
-                    console.error("OCR 모듈 초기설정 에러:", e);
-                }
-            }
-        }
 
         // 스캐너 모달 생성 및 뷰포트 레이아웃 구성
         async function openCameraModal() {
@@ -269,7 +261,8 @@
                     <div id="cameraContainer" class="relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300">
                         <!-- 화면 꽉 차게 렌더링 (object-cover에서 object-contain으로 변경하여 짤림 방지) -->
                         <video id="cameraVideo" class="w-full h-full object-contain" autoplay playsinline></video>
-                        <canvas id="hiddenCanvas" class="hidden"></canvas> <!-- 분석 처리용 백그라운드 캔버스 -->
+                        <canvas id="hiddenCanvas" class="hidden"></canvas> <!-- 분석 처리용 백그라운드 캡처 캔버스 -->
+                        <canvas id="cropCanvas" class="hidden"></canvas> <!-- 박스 영역 크롭용 캔버스 -->
                         
                         <!-- 스캔 가이드 인터페이스 -->
                         <div class="absolute inset-0 flex items-center justify-center pointer-events-none p-4">
@@ -280,6 +273,9 @@
 
                     <!-- 실시간 텍스트 피드백 알림 영역 -->
                     <div id="ocrResultArea" class="bg-white p-6 min-h-[160px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300">
+                        <!-- 크롭된 이미지 미리보기 -->
+                        <img id="magnifiedImg" class="hidden w-full max-h-32 object-contain mb-4 rounded-lg border border-gray-300 shadow-sm" alt="확대된 유통기한">
+                        
                         <p id="ocrText" class="text-3xl font-black text-gray-900 text-center break-words w-full">
                             화면 안으로 약병의 유통기한 부분을 비춰주세요.<br>
                             <span class="text-xl text-blue-600 mt-2 block">(자동으로 글자를 찾아 읽어드립니다)</span>
@@ -296,6 +292,10 @@
 
             // 모달 초기 상태 및 스타일 셋업
             document.getElementById('cameraModal').classList.remove('hidden');
+            
+            const magnifiedImg = document.getElementById('magnifiedImg');
+            if (magnifiedImg) magnifiedImg.classList.add('hidden');
+
             document.getElementById('ocrResultArea').className = "bg-white p-6 min-h-[160px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300";
             document.getElementById('cameraContainer').className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300";
             document.getElementById('ocrText').innerHTML = '화면 안으로 약병의 유통기한 부분을 비춰주세요.<br><span class="text-xl text-blue-600 mt-2 block">(자동으로 글자를 찾아 읽어드립니다)</span>';
@@ -304,7 +304,6 @@
             
             speak("자동 스캔 모드를 가동합니다. 화면 전체에 유통기한 글씨가 들어오도록 비추고 가만히 계셔 주세요.");
 
-            await initTesseract(); // OCR 엔진이 로드 완료되었는지 검증 및 초기화
             await startCamera();   // 카메라 구동
         }
 
@@ -386,53 +385,114 @@
             }).catch(e => console.warn("하드웨어 플래시 제어 명령이 거부되었습니다:", e));
         }
 
-        // 실시간 화면 스캔 및 영상 필터링 프로세스 (전체 화면 최적화)
+        // 실시간 화면 스캔 및 영상 필터링 프로세스 (Roboflow + Google Vision 연동)
         async function scanLoop() {
-            if (!isScanning || hasFoundResult) return;
+            if (!isScanning || hasFoundResult || isProcessing) return;
+            
+            isProcessing = true; // 중복 요청 방지 잠금
 
             const video = document.getElementById('cameraVideo');
-            const canvas = document.getElementById('hiddenCanvas');
+            const capCanvas = document.getElementById('hiddenCanvas');
+            const cropCanvas = document.getElementById('cropCanvas');
             
             // 화면 크기 체크 및 대기 처리
             if (video.videoWidth === 0 || video.videoHeight === 0) {
+                isProcessing = false;
                 scanTimer = setTimeout(scanLoop, 500);
                 return;
             }
 
-            // 모바일에서 고해상도 전체 화면을 스캔하면 성능 저하(랙, 튕김)가 발생하므로,
-            // 캔버스 해상도를 최대 1000px 수준으로 스케일링하여 OCR 속도와 메모리를 최적화합니다.
-            const MAX_SIZE = 1000;
-            let scale = 1;
-            if (video.videoWidth > MAX_SIZE || video.videoHeight > MAX_SIZE) {
-                scale = MAX_SIZE / Math.max(video.videoWidth, video.videoHeight);
-            }
-
-            const scanWidth = Math.floor(video.videoWidth * scale);
-            const scanHeight = Math.floor(video.videoHeight * scale);
-
-            canvas.width = scanWidth;
-            canvas.height = scanHeight;
-            
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            
-            // 이미지 분석 감도를 높이기 위해 흑백 전환 및 극대 대비 필터 처리 적용
-            ctx.filter = 'grayscale(100%) contrast(210%) brightness(120%)';
-            // 비디오 화면 전체를 캔버스에 그리기 (Downscale 적용)
-            ctx.drawImage(video, 0, 0, scanWidth, scanHeight);
-            
             try {
-                // Tesseract v5 엔진 충돌 방지를 위해 무결한 Base64 JPEG 변환 전달
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                const { data: { text } } = await ocrWorker.recognize(dataUrl);
+                // 1. 카메라 화면 캡처
+                capCanvas.width = video.videoWidth;
+                capCanvas.height = video.videoHeight;
+                const capCtx = capCanvas.getContext('2d', { willReadFrequently: true });
+                capCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
                 
-                processRecognizedText(text);
-            } catch (error) {
-                console.error('OCR 파싱 루프 예외 발생:', error);
-            }
+                const base64Image = capCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-            // 결과를 찾지 못했다면 1.5초 후 반복해서 비동기 스캔 호출
-            if (isScanning && !hasFoundResult) {
-                scanTimer = setTimeout(scanLoop, 1500);
+                // 2. Roboflow API로 유통기한 위치 파악
+                const roboUrl = `https://detect.roboflow.com/${API_KEYS.MODEL_ID}?api_key=${API_KEYS.ROBOFLOW}`;
+                const roboResponse = await fetch(roboUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: base64Image,
+                });
+                
+                const roboResult = await roboResponse.json();
+
+                // 찾지 못한 경우 루프 재개
+                if (!roboResult.predictions || roboResult.predictions.length === 0) {
+                    isProcessing = false;
+                    if (isScanning && !hasFoundResult) {
+                        scanTimer = setTimeout(scanLoop, 800);
+                    }
+                    return;
+                }
+
+                // 3. 가장 정확도 높은 위치 찾기 및 크롭(자르기)
+                const bestBox = roboResult.predictions.reduce((prev, current) =>
+                    prev.confidence > current.confidence ? prev : current
+                );
+
+                const padW = bestBox.width * 0.15;
+                const padH = bestBox.height * 0.15;
+                const sx = Math.max(0, bestBox.x - bestBox.width / 2 - padW);
+                const sy = Math.max(0, bestBox.y - bestBox.height / 2 - padH);
+                const sWidth = Math.min(capCanvas.width - sx, bestBox.width + padW * 2);
+                const sHeight = Math.min(capCanvas.height - sy, bestBox.height + padH * 2);
+
+                cropCanvas.width = sWidth;
+                cropCanvas.height = sHeight;
+                const cropCtx = cropCanvas.getContext('2d');
+                
+                // 가독성을 위한 이진화/대비 향상 필터 적용
+                cropCtx.filter = 'grayscale(100%) contrast(300%)';
+                cropCtx.drawImage(capCanvas, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+
+                // 크롭된 이미지를 base64로 변환하고 화면에 미리보기 표시
+                const croppedBase64Url = cropCanvas.toDataURL('image/jpeg', 0.9);
+                const croppedBase64 = croppedBase64Url.split(',')[1];
+                
+                const magnifiedImg = document.getElementById('magnifiedImg');
+                magnifiedImg.src = croppedBase64Url;
+                magnifiedImg.classList.remove('hidden');
+
+                document.getElementById('ocrText').innerHTML = '유통기한 상자를 발견했습니다!<br><span class="text-xl text-orange-500 mt-2 block animate-pulse">구글 AI가 글씨를 읽는 중입니다...</span>';
+
+                // 4. 구글 Vision API로 텍스트 추출
+                const googleUrl = `https://vision.googleapis.com/v1/images:annotate?key=${API_KEYS.GOOGLE_VISION}`;
+                const googlePayload = {
+                    requests: [{
+                        image: { content: croppedBase64 },
+                        features: [{ type: 'TEXT_DETECTION' }],
+                    }],
+                };
+
+                const googleResponse = await fetch(googleUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(googlePayload),
+                });
+                
+                const googleResult = await googleResponse.json();
+
+                let textFound = '';
+                if (googleResult.responses && googleResult.responses[0].textAnnotations) {
+                    textFound = googleResult.responses[0].textAnnotations[0].description.trim().replace(/\s+/g, ' ');
+                }
+
+                // 5. 추출된 텍스트 처리 및 날짜 판별 (기존의 정규식 검증으로 넘어감)
+                processRecognizedText(textFound);
+
+            } catch (error) {
+                console.error('OCR 파싱 루프 예외 발생 (API 연동 에러):', error);
+            } finally {
+                isProcessing = false;
+                // 결과를 못 찾았을 때만 다시 스캔 (찾았으면 processRecognizedText에서 hasFoundResult = true 설정됨)
+                if (isScanning && !hasFoundResult) {
+                    scanTimer = setTimeout(scanLoop, 1000);
+                }
             }
         }
 
@@ -506,6 +566,13 @@
         // 스캐너 상태 초기화 및 루프 리부트
         function resumeScanning() {
             hasFoundResult = false;
+            isProcessing = false;
+            
+            const magnifiedImg = document.getElementById('magnifiedImg');
+            if(magnifiedImg) {
+                magnifiedImg.classList.add('hidden');
+                magnifiedImg.src = '';
+            }
             
             document.getElementById('ocrResultArea').className = "bg-white p-6 min-h-[160px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300";
             document.getElementById('cameraContainer').className = "relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300";
