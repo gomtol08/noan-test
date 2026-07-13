@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>의약품 정보 확대 도우미</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tesseract.js 최신 v5 안정 버전 로드 -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap"
       rel="stylesheet"
@@ -283,6 +285,7 @@
       // 상태 제어 전역 변수
       let videoStream = null;
       let videoTrack = null;
+      let ocrWorker = null;
       let isScanning = false;
       let scanTimer = null;
       let isTorchOn = false;
@@ -290,6 +293,10 @@
       let isSoundOn = true;
       let currentVolume = 1.0;
       let isProcessingFrame = false;
+
+      // 동일 글씨 연속 검증 (집중 인식 로직) 전역 변수
+      let lastRecognizedText = "";
+      let consecutiveMatchCount = 0;
 
       // TTS(음성 합성) 지원 함수
       function speak(text) {
@@ -361,7 +368,7 @@
         if (!document.getElementById('cameraModal')) {
           const modalHtml = `
                 <div id="cameraModal" class="fixed inset-0 bg-black z-50 flex flex-col" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-                    <div class="p-4 flex justify-between items-center bg-gray-900 text-white border-b border-gray-800">
+                    <div class="p-4 flex justify-between items-center bg-gray-900 text-white border-b border-gray-800 shrink-0">
                         <h2 id="modalTitle" class="text-2xl font-black">유통기한 스캔 카메라</h2>
                         <div class="flex gap-3">
                             <button id="flashBtn" onclick="toggleFlash()" class="hidden text-xl font-bold bg-yellow-400 text-black px-4 py-2 rounded-xl focus:outline-none">
@@ -384,13 +391,19 @@
                         </div>
                     </div>
 
-                    <div id="ocrResultArea" class="bg-white p-6 min-h-[160px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300">
-                        <img id="magnified-img" class="hidden w-full max-w-sm max-h-[200px] object-contain my-2 border-2 border-gray-300 rounded-lg shadow-md" alt="확대된 유통기한" />
+                    <!-- 모바일 디바이스 가득 차는 현상 및 스크롤 문제를 완벽하게 방지하는 터치 조절 창 설정 (max-h 및 overflow-y 적용) -->
+                    <div id="ocrResultArea" class="bg-white p-6 min-h-[180px] max-h-[45vh] overflow-y-auto flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300 w-full shrink-0">
+                        <img id="magnified-img" class="hidden w-full max-w-sm max-h-[160px] object-contain my-2 border-2 border-gray-300 rounded-lg shadow-md" alt="확대된 유통기한" />
                         
                         <p id="ocrText" class="text-3xl font-black text-gray-900 text-center break-words w-full mt-2">
                             화면 안으로 약병의 유통기한 부분을 비춰주세요.<br>
                             <span class="text-xl text-blue-600 mt-2 block">(자동으로 글자를 찾아 읽어드립니다)</span>
                         </p>
+
+                        <!-- 집중 판독된 유통기한 내용이 잘못 인식되었을 시, 초기화 및 재시작하게 만드는 맞춤형 리트라이 버튼 탑재 -->
+                        <button id="retryBtn" onclick="retryScanning()" class="hidden mt-4 w-full max-w-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xl font-black py-4 rounded-2xl shadow-xl transition-all transform active:scale-95 flex items-center justify-center gap-2" aria-label="다시 인식하기">
+                            🔄 다시 인식하기
+                        </button>
                     </div>
                 </div>
                 `;
@@ -437,7 +450,6 @@
 
           videoElement.onloadedmetadata = () => {
             isScanning = true;
-            // overlayCanvas 크기를 비디오 요소에 맞춤
             resizeOverlayCanvas();
             window.addEventListener('resize', resizeOverlayCanvas);
             scanLoop();
@@ -609,7 +621,7 @@
             });
             const googleResult = await googleResponse.json();
 
-            // 4. 결과 도출 및 빨간색 텍스트 출력
+            // 4. 결과 도출 및 동일 글씨 2~3회 반복 검증 로직 가동
             if (
               googleResult.responses &&
               googleResult.responses[0].textAnnotations
@@ -619,22 +631,55 @@
                   .trim()
                   .replace(/\s+/g, ' ');
 
-              // 빨간색 텍스트로 결과 표시
-              resultText.innerHTML = `
+              // 이중 동일 글씨 인식 안정화 판정 검증 루틴
+              if (textFound === lastRecognizedText) {
+                consecutiveMatchCount++;
+              } else {
+                lastRecognizedText = textFound;
+                consecutiveMatchCount = 1;
+              }
+
+              // 같은 글씨가 2번 연속 똑같이 들어왔을 때 -> 최종 집중 인식 완료 판독 처리
+              if (consecutiveMatchCount >= 2) {
+                isScanning = false; // 일시 루프 정지 (정적 유지를 위함)
+                clearTimeout(scanTimer);
+
+                // UI 연출 성공 상태로 격상 (성공적인 녹색 테두리 적용)
+                document.getElementById('cameraContainer').className =
+                  'relative flex-grow flex flex-col items-center justify-center bg-black overflow-hidden border-8 border-green-500 transition-all duration-300';
+                document.getElementById('ocrResultArea').className =
+                  'bg-green-50 p-6 min-h-[180px] max-h-[45vh] overflow-y-auto flex flex-col justify-center items-center border-t-4 border-green-500 transition-colors duration-300 w-full shrink-0';
+
+                resultText.innerHTML = `
+                    <span class="text-green-700 text-2xl font-black mb-1 block">🎯 유통기한 인식 고정</span>
                     <span class="text-red-600 text-4xl sm:text-5xl font-black tracking-wider break-all">${textFound}</span>
                 `;
 
-              // 음성 출력 (중복 방지를 위해 일정 시간 간격으로만 출력하도록 수정 가능)
-              speak(`인식된 내용: ${textFound}`);
+                // 오버레이 캔버스에 빨간 상자가 유지되도록 함
+                document.getElementById('retryBtn').classList.remove('hidden');
+
+                // 음성 출력 (집중 정지 시점에 단 1회 선명하게 음성 전달)
+                speak(`인식된 유통기한 내용: ${textFound}`);
+              } else {
+                // 아직 1회차 인식이거나 글자가 일시적으로 떨리고 있는 경우의 임시 판독 알림
+                resultText.innerHTML = `
+                    <span class="text-amber-600 text-xl font-bold mb-1 block">확인 중 (초점을 맞춰주세요)...</span>
+                    <span class="text-red-600 text-3xl sm:text-4xl font-black tracking-wider break-all">${textFound}</span>
+                `;
+                speak(textFound);
+              }
             } else {
               resultText.innerHTML = `<span class="text-red-600 text-2xl font-black">글자를 감지하지 못했습니다.</span>`;
+              lastRecognizedText = "";
+              consecutiveMatchCount = 0;
             }
           }
         } catch (error) {
           console.error('통신 에러:', error);
         } finally {
           isProcessingFrame = false; // 락 해제
-          // 지속적인 스캔을 위해 다시 호출 (새로고침 효과)
+          
+          // 집중 인식이 완료되어 isScanning이 false로 닫힌 경우를 제외하고 지속 스캔
           if (isScanning) {
             scanTimer = setTimeout(scanLoop, 500); // 0.5초 간격으로 스캔
           }
@@ -642,10 +687,13 @@
       }
 
       function triggerNotFoundUI() {
+        // Roboflow 탐지 실패 시 정밀 집중 인식 카운터 리셋
+        lastRecognizedText = "";
+        consecutiveMatchCount = 0;
+
         const currentTime = Date.now();
         if (currentTime - lastAudioAlertTime > 5000) {
           const resultText = document.getElementById('ocrText');
-
           resultText.innerHTML = `
                   <span class="text-red-600 text-2xl font-black leading-snug">
                       유통기한을 찾는 중...
@@ -655,21 +703,49 @@
         }
       }
 
+      // 잘못 인식했을 때 새로 락을 풀고 다시 인식하게 해주는 버튼 컨트롤러
+      function retryScanning() {
+        lastRecognizedText = "";
+        consecutiveMatchCount = 0;
+        isScanning = true;
+        isProcessingFrame = false;
+
+        resetUIForScanning();
+        speak('다시 인식을 시작합니다. 약 상자의 글자를 화면에 비춰주세요.');
+        
+        // 스캔 분석 시작
+        scanLoop();
+      }
+
       function resetUIForScanning() {
         document.getElementById('ocrResultArea').className =
-          'bg-white p-6 min-h-[160px] flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300';
+          'bg-white p-6 min-h-[180px] max-h-[45vh] overflow-y-auto flex flex-col justify-center items-center border-t-4 border-gray-300 transition-colors duration-300 w-full shrink-0';
         document.getElementById('cameraContainer').className =
           'relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300';
         document.getElementById('ocrText').innerHTML =
           '화면 안으로 약병의 유통기한 부분을 비춰주세요.<br><span class="text-xl text-blue-600 mt-2 block">(자동으로 글자를 찾아 읽어드립니다)</span>';
         document.getElementById('scanLine').style.display = 'block';
         document.getElementById('magnified-img').classList.add('hidden');
+        document.getElementById('retryBtn').classList.add('hidden');
 
         // 오버레이 캔버스 초기화
         const overlayCanvas = document.getElementById('overlayCanvas');
         if (overlayCanvas) {
           const overlayCtx = overlayCanvas.getContext('2d');
           overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        }
+      }
+
+      // OCR 엔진 구축 (더미)
+      async function initTesseract() {
+        if (!ocrWorker) {
+          try {
+            console.log("OCR 엔진을 구축하는 중...");
+            ocrWorker = await Tesseract.createWorker('kor+eng');
+            console.log("Tesseract 엔진 활성화 성공");
+          } catch (e) {
+            console.error("OCR 모듈 초기설정 에러:", e);
+          }
         }
       }
     </script>
