@@ -243,7 +243,7 @@
               >1</span
             >
             <span class="flex-1 break-keep leading-relaxed pt-1.5 sm:pt-2"
-              >위의 <strong>[박스형 약품]</strong> 버튼을 누릅니다.</span
+              >위의 원하는 <strong>약품의 형태</strong>를 고릅니다.</span
             >
           </li>
           <li class="flex items-start gap-3 sm:gap-4">
@@ -252,9 +252,8 @@
               >2</span
             >
             <span class="flex-1 break-keep leading-relaxed pt-1.5 sm:pt-2"
-              >카메라 접근을 허용한 뒤,
-              <strong>화면 안으로 약 상자의 유통기한 글자가 들어오도록</strong>
-              비춰주세요.</span
+              >카메라 접근을 허용한 뒤, 화면 안으로
+              <strong>약 정보</strong>가 들어오도록 비춰주세요.</span
             >
           </li>
           <li class="flex items-start gap-3 sm:gap-4">
@@ -263,8 +262,7 @@
               >3</span
             >
             <span class="flex-1 break-keep leading-relaxed pt-1.5 sm:pt-2"
-              >잠시 가만히 계시면 자동으로 인식을 완료해 음성으로
-              읽어줍니다.</span
+              >잠시 가만히 계시면 자동으로 인식을 완료해 유통기한을 표시합니다.</span
             >
           </li>
         </ol>
@@ -600,7 +598,7 @@
             document.getElementById('magnified-img').classList.remove('hidden');
 
             const resultText = document.getElementById('ocrText');
-            resultText.innerHTML = `<span class="text-3xl font-black loading-text">글자를 판독 중입니다...</span>`;
+            resultText.innerHTML = `<span class="text-3xl font-black loading-text">글자를 판독 중...</span>`;
 
             // 3. 구글 비전 API로 텍스트 정밀 판독
             const cleanCroppedBase64 = croppedBase64.split(',')[1];
