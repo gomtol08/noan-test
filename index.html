@@ -164,7 +164,7 @@
           <span
             class="text-3xl sm:text-4xl font-black text-center leading-tight"
           >
-            박스형 약품<br />
+            박스<br />
             <span
               class="text-lg sm:text-xl opacity-90 font-bold mt-2 block bg-blue-800 px-3 py-1 rounded-full"
               >자동 유통기한 스캔</span
@@ -187,7 +187,7 @@
           <span
             class="text-3xl sm:text-4xl font-black text-center leading-tight"
           >
-            병형 약품<br />
+            병<br />
             <span
               class="text-lg sm:text-xl opacity-90 font-bold mt-2 block bg-emerald-800 px-3 py-1 rounded-full"
               >자동 유통기한 스캔</span
@@ -199,7 +199,7 @@
           id="btn-feature-3"
           onclick="selectFeature(3)"
           class="group flex flex-col items-center justify-center bg-purple-600 hover:bg-purple-700 text-white rounded-3xl p-8 shadow-xl transition-transform transform hover:scale-105 border-4 border-transparent focus:border-yellow-400"
-          aria-label="알약 통형 약품 유통기한 자동 스캔 시작"
+          aria-label="약통 형태 약품 유통기한 자동 스캔 시작"
         >
           <img
             src="멜라치오.jpg"
@@ -210,7 +210,7 @@
           <span
             class="text-3xl sm:text-4xl font-black text-center leading-tight"
           >
-            알약 통형<br />
+            약통<br />
             <span
               class="text-lg sm:text-xl opacity-90 font-bold mt-2 block bg-purple-800 px-3 py-1 rounded-full"
               >자동 유통기한 스캔</span
@@ -353,16 +353,16 @@
         if (featureNum === 1) {
           API_KEYS.ROBOFLOW = '7V6pHoQiA8J5kjO1LCuX';
           API_KEYS.MODEL_ID = 'medicine_date2/1';
-          speak('박스형 약품 인식기를 준비하고 있습니다. 잠시만 기다려주세요.');
+          speak('박스 형태 약품 인식기를 준비하고 있습니다. 잠시만 기다려주세요.');
         } else if (featureNum === 2) {
           API_KEYS.ROBOFLOW = 'ixnhP2kovsMPC7CZ73uH';
           API_KEYS.MODEL_ID = 'glass_medicine_date1/1';
-          speak('병형 약품 인식기를 준비하고 있습니다. 잠시만 기다려주세요.');
+          speak('병 형태 약품 인식기를 준비하고 있습니다. 잠시만 기다려주세요.');
         } else if (featureNum === 3) {
           API_KEYS.ROBOFLOW = 'm0VswrvOxGyVVYgHJzLT';
           API_KEYS.MODEL_ID = 'tung_medicine_date1/1';
           speak(
-            '알약 통형 약품 인식기를 준비하고 있습니다. 잠시만 기다려주세요.',
+            '약통 형태 약품 인식기를 준비하고 있습니다. 잠시만 기다려주세요.',
           );
         }
 
@@ -414,7 +414,7 @@
         document.getElementById('cameraModal').classList.remove('hidden');
         resetUIForScanning();
         speak(
-          '자동 스캔 모드를 가동합니다. 화면 전체에 유통기한 글씨가 들어오도록 비추고 가만히 계셔 주세요.',
+          '자동 스캔 모드를 가동합니다. 화면 전체에 약 정보가 들어오도록 비추고 가만히 계셔 주세요.',
         );
         await startCamera();
       }
@@ -593,7 +593,7 @@
             const resultText = document.getElementById('ocrText');
 
             // [개선 3] 인식 도중에는 지저분한 결과 대신 일관된 "분석 중" 안내 메시지만 출력하여 혼란 방지
-            resultText.innerHTML = `<span class="text-3xl font-black loading-text">사용기간 패턴을 정밀 분석 중입니다...</span>`;
+            resultText.innerHTML = `<span class="text-3xl font-black loading-text">유통기한 패턴을 정밀 분석 중입니다...</span>`;
 
             const cleanCroppedBase64 = croppedBase64.split(',')[1];
             const googleUrl = `https://vision.googleapis.com/v1/images:annotate?key=${API_KEYS.GOOGLE_VISION}`;
@@ -695,7 +695,7 @@
           const resultText = document.getElementById('ocrText');
           resultText.innerHTML = `
                   <span class="text-red-600 text-2xl font-black leading-snug">
-                      사용기간이 인식되지 않았습니다. 다른 부분을 비춰주세요.
+                      유통기한이 인식되지 않았습니다. 다른 부분을 비춰주세요.
                   </span>
               `;
           lastAudioAlertTime = currentTime;
@@ -709,7 +709,7 @@
         isProcessingFrame = false;
 
         resetUIForScanning();
-        speak('다시 인식을 시작합니다. 약 상자의 글자를 화면에 비춰주세요.');
+        speak('다시 인식을 시작합니다. 약 정보를 화면에 비춰주세요.');
         scanLoop();
       }
 
