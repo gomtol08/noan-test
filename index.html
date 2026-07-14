@@ -661,7 +661,7 @@
               } else {
                 // 아직 1회차 인식이거나 글자가 일시적으로 떨리고 있는 경우의 임시 판독 알림
                 resultText.innerHTML = `
-                    <span class="text-amber-600 text-xl font-bold mb-1 block">확인 중 (초점을 맞춰주세요)...</span>
+                    <span class="text-amber-600 text-xl font-bold mb-1 block">사용기간이 인식되었습니다. 카메라를 고정해주세요.</span>
                     <span class="text-red-600 text-3xl sm:text-4xl font-black tracking-wider break-all">${textFound}</span>
                 `;
                 speak(textFound);
@@ -694,7 +694,7 @@
           const resultText = document.getElementById('ocrText');
           resultText.innerHTML = `
                   <span class="text-red-600 text-2xl font-black leading-snug">
-                      유통기한을 찾는 중...
+                      사용기간이 인식되지 않았습니다. 다른 부분을 비춰주세요.
                   </span>
               `;
           lastAudioAlertTime = currentTime;
