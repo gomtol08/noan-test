@@ -57,22 +57,6 @@
         outline-offset: 4px !important;
       }
 
-      /* 스캔 레이저 라인 애니메이션 */
-      @keyframes scan-anim {
-        0% {
-          top: 0%;
-        }
-        50% {
-          top: 100%;
-        }
-        100% {
-          top: 0%;
-        }
-      }
-      .animate-scan {
-        animation: scan-anim 2s infinite linear;
-      }
-
       /* 로딩 중 깜빡임 효과 */
       .loading-text {
         animation: blinker 1s linear infinite;
@@ -383,10 +367,6 @@
                         <canvas id="overlayCanvas"></canvas>
                         <canvas id="hiddenCanvas" class="hidden"></canvas>
                         <canvas id="cropCanvas" class="hidden"></canvas>
-                        
-                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none p-4">
-                            <div id="scanLine" class="absolute w-full h-1 bg-yellow-400 top-0 opacity-80 animate-scan shadow-[0_0_15px_rgba(250,204,21,0.8)]"></div>
-                        </div>
                     </div>
 
                     <!-- 모바일 디바이스 가득 차는 현상 및 스크롤 문제를 완벽하게 방지하는 터치 조절 창 설정 (max-h 및 overflow-y 적용) -->
@@ -722,7 +702,6 @@
           'relative flex-grow flex items-center justify-center bg-black overflow-hidden border-8 border-transparent transition-all duration-300';
         document.getElementById('ocrText').innerHTML =
           '화면 안으로 약병의 유통기한 부분을 비춰주세요.<br><span class="text-xl text-blue-600 mt-2 block">(자동으로 글자를 찾아 읽어드립니다)</span>';
-        document.getElementById('scanLine').style.display = 'block';
         document.getElementById('magnified-img').classList.add('hidden');
         document.getElementById('retryBtn').classList.add('hidden');
 
